@@ -24,9 +24,10 @@
  
 #define NUMCOLORS 7
 #define COLORTIME 1000
-#define COLORDELAY 10
+#define COLORDELAY 100
 #define INCREMENTS (COLORTIME/COLORDELAY)
-#define HISTORY INCREMENTS
+//#define HISTORY INCREMENTS
+#define HISTORY 1
 //#define D1 ((HISTORY/2)-1)
 //#define D2 (HISTORY-1)
 #define D1 0
