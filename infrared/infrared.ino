@@ -26,14 +26,14 @@
 #define NUMCOLORS (sizeof(colorwheel)/(sizeof(int)*3))
 #define IRPIN 12
 #define IRMAG(d) ((1000 - (float)(d))/1000)
-#define MAXVALUES 500
+#define PROTOCOL_UNKNOWN 0
+#define PROTOCOL_SHARP 1
 #define PROTOCOL PROTOCOL_SHARP
-
-enum {
-  PROTOCOL_SHARP = 0,
-  PROTOCOL_SONY,
-  PROTOCOL_HAUPPAUGE
-};
+#if (PROTOCOL == PROTOCOL_SHARP)
+#define MAXVALUES 32
+#else
+#define MAXVALUES 500
+#endif
 
 // sections of the IR waveform
 enum {
@@ -43,14 +43,16 @@ enum {
   WF      // FALLING EDGE
 };
 
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
 // start and end time of the IR burst
 long start = -1, end = -1;
 // positive duty cycle per burst bit
 long pdc[MAXVALUES];
 // negative duty cycle per burst bit
 long ndc[MAXVALUES];
+#endif
 // burst bit counter
-long idx = 0;
+long numvals = 0;
  
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
@@ -60,7 +62,9 @@ int colorwheel[][3] = {
   {  0, 255,   0}, // 4: green
   {  0,   0, 255}, // 5: blue
   {127,   0, 255}, // 6: indigo
-  {255,   0, 255}  // 7: violet
+  {255,   0, 255}, // 7: violet
+  {  0, 255, 255}, // 8: seagreen
+  {255, 127, 255}  // 9: white
 };
 
 void setup() {
@@ -142,11 +146,12 @@ int waveform(float val)
  *   microtime: microsecond timestamp (used for timing info)
  *   millitime: millisecond timestamp (capture a maximum of 1 second of data)
  */
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
 void transition(bool val, long microtime, long millitime)
 {
   static long pmicrotime = -1;
 
-  if((start < 0)||(end - start <= 1000))
+  if((numvals < MAXVALUES)&&((start < 0)||(end - start <= 1000)))
   {
     if(start < 0)
       start = millitime;
@@ -154,17 +159,50 @@ void transition(bool val, long microtime, long millitime)
     
     if(val)
     {
-      ndc[idx] = microtime - pmicrotime;
-      idx++;
+      if(numvals > 0)
+        ndc[numvals-1] = microtime - pmicrotime;
+      numvals++;
     }
     else
     {
-      pdc[idx] = microtime - pmicrotime;
+      if(numvals > 0)
+        pdc[numvals-1] = microtime - pmicrotime;
     }
   }
-
+  
   pmicrotime = microtime;
 }
+#else
+void transition(bool val, long microtime, long millitime)
+{
+  static long pmicrotime = -100000;
+  static long data = 0, bits = 0;
+
+  if(val)
+  {
+    // get the negative duty cycle
+    long ndc = microtime - pmicrotime;
+    // queue up valid bits
+    if(ndc < 20000)
+    {
+      long out = (ndc > 1000)?1:0;
+      data = (data << 1) | (out & 0x1);
+      bits++;
+    }
+    if((ndc > 20000)||(bits >= 15))
+    {
+      if(bits >= 15)
+      {
+        datapacket(data, 15);
+      }
+      data = 0;
+      bits = 0;
+    }
+  }
+  
+  pmicrotime = microtime;
+}
+#endif
 
 /*
  * Name: datapacket
@@ -173,18 +211,10 @@ void transition(bool val, long microtime, long millitime)
  *   data: data packet
  *   length: number of bits in data packet
  */
-int datapacket(long rawdata, int length)
+int datapacket(long data, int length)
 {
 #if (PROTOCOL == PROTOCOL_SHARP)
   int i, chk, cmd, adr;
-  long data = 0;
-  
-  if(length != 15)
-    return 0;
-
-  // reverse the bits
-  for(i = length-1; i >= 0; i--)
-    data |= ((rawdata >> i) & 0x1) << (length-i-1);
   
   // extract the fields  
   chk = data & 0x3;
@@ -198,9 +228,14 @@ int datapacket(long rawdata, int length)
   Serial.print(cmd);
   Serial.print(" - ");
   Serial.println(adr);
-
-  return keymap(cmd, adr);
+  i = keymap(cmd, adr);
+  rgb(colorwheel[i][0], colorwheel[i][1], colorwheel[i][2]);
+  return 0;
 #else
+  Serial.print("len: ");
+  Serial.print(length);
+  Serial.print(" data: ");
+  Serial.println(data, BIN);
   return 0;
 #endif
 }
@@ -213,25 +248,25 @@ int keymap(int cmd, int addr)
 
   switch(cmd) {
     case 128: //1
-      return 1;
-    case 64: //2
       return 4;
-    case 192: //3
+    case 64: //2
       return 5;
+    case 192: //3
+      return 4;
     case 32: //4
-      return 1;
+      return 5;
     case 160: //5
       return 4;
     case 96: //6
       return 5;
     case 224: //7
-      return 1;
+      return 4;
     case 16: //8
-      return 4;
-    case 144: //9
       return 5;
-    default:
+    case 144: //9
       return 4;
+    default:
+      return 0;
   }
 #endif
 }
@@ -245,7 +280,6 @@ void loop() {
   float mag = IRMAG(raw);
   // find the current waveform state
   int state = waveform(mag);
-  static int defcolor = 4;
   int i;
 
   switch(state) {
@@ -255,8 +289,10 @@ void loop() {
       {
         // transition on rising edge or flip to 1
         transition(true, microtime, millitime);
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
         lastcap = millitime;
-        color(defcolor, 1);
+        color(4, 1);
+#endif
       }
       break;
     case WF:
@@ -265,8 +301,10 @@ void loop() {
       {
         // transition on falling edge or flip to 0
         transition(false, microtime, millitime);
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
         lastcap = millitime;
         color(0, 1);
+#endif
       }
       break;
     default:
@@ -275,20 +313,21 @@ void loop() {
   }
   pstate = state;
   
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
   // print out the data after the burst has stopped. This is
   // necessary because the 9600 baud console will mess up the
   // timing if we print during the burst
-  if((idx > 0)&&(lastcap >= 0)&&(millitime - lastcap > 200))
+  if((numvals > 0)&&(lastcap >= 0)&&(millitime - lastcap > 200))
   {
       Serial.print("---- captured ");
       Serial.print(end - start);
       Serial.print(" ms -- ");
-      Serial.print(idx);
+      Serial.print(numvals);
       Serial.println(" values ----");
       long total = 0;
       long data = 0;
       int bit = 0;
-      for(i = 1; i < idx; i++)
+      for(i = 0; i < numvals; i++)
       {
         total += pdc[i]+ndc[i];
         if(ndc[i] < 20000)
@@ -297,18 +336,19 @@ void loop() {
           data |= (out << bit);
           bit++;
         }
-        if((ndc[i] > 20000)||(i == idx - 1))
+        if((ndc[i] > 20000)||(i == numvals - 1))
         {
-          defcolor = datapacket(data, bit);
+          datapacket(data, bit);
           data = 0;
           bit = 0;
         }       
       }
       Serial.print(total);
       Serial.println(" us");
-      idx = 0;
+      numvals = 0;
       lastcap = -1;
       start = end = -1;
    }
+#endif
 }
 
