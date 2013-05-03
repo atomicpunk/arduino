@@ -25,7 +25,25 @@
 #define SERIAL_BAUD 9600
 #define NUMCOLORS (sizeof(colorwheel)/(sizeof(int)*3))
 #define IRPIN 12
-#define IRMAG(d) ((995 - (float)(d))/995)
+#define IRMAG(d) ((1000 - (float)(d))/1000)
+#define MAXVALUES 500
+
+// sections of the IR waveform
+enum {
+  W0 = 0, // ZERO
+  WR,     // RISING EDGE
+  W1,     // ONE
+  WF      // FALLING EDGE
+};
+
+// start and end time of the IR burst
+long start = -1, end = -1;
+// positive duty cycle per burst bit
+long pdc[MAXVALUES];
+// negative duty cycle per burst bit
+long ndc[MAXVALUES];
+// burst bit counter
+long idx = 0;
 
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
@@ -62,13 +80,16 @@ void color(int cidx, float mag)
       (int)(mag*(float)colorwheel[cidx][2]));
 }
 
-enum {
-  W0 = 0, // ZERO
-  WR,     // RISING EDGE
-  W1,     // ONE
-  WF      // FALLING EDGE
-};
-
+/*
+ * Name: waveform
+ * Desc: calculate which phase of a PWM waveform a
+ * signal is in given a value representing the fraction
+ * of max signal detected.
+ * Args:
+ *   val: a number between 0 and 1 representing the data
+ *   value read on the analog signal line. 1 is the maximum
+ *   value detectable, such as 1000 from the ADC
+ */
 int waveform(float val)
 {
   static float pval = val;
@@ -104,62 +125,125 @@ int waveform(float val)
   return res;
 }
 
-#define MAXVALUES 1000
-int pdc[MAXVALUES];
-int ndc[MAXVALUES];
-int numvalues = 0;
+/*
+ * Name: transition
+ * Desc: calculate the timing of a digital waveform by
+ * analyzing it at each transition point. From 0 to 1,
+ * and 1 to 0.
+ * Args:
+ *   val: true means transition to 1, false transition to 0
+ *   microtime: microsecond timestamp (used for timing info)
+ *   millitime: millisecond timestamp (capture a maximum of 1 second of data)
+ */
+void transition(bool val, long microtime, long millitime)
+{
+  static long pmicrotime = -1;
+
+  if((start < 0)||(end - start <= 1000))
+  {
+    if(start < 0)
+      start = millitime;
+    end = millitime;
+    
+    if(val)
+    {
+      ndc[idx] = microtime - pmicrotime;
+      idx++;
+    }
+    else
+    {
+      pdc[idx] = microtime - pmicrotime;
+    }
+  }
+
+  pmicrotime = microtime;
+}
+
+/*
+ * Name: datapacket
+ * Desc: handle a data packet recieved through an IR signal
+ * Args:
+ *   data: data packet
+ *   length: number of bits in data packet
+ */
+void datapacket(long data, int length)
+{
+
+}
 
 void loop() {
-  static long microtime = -1, millitime = -1;
+  long microtime = micros(), millitime = millis();
+  static long lastcap = -1, pstate = W0;
+  // read the data from the pin as raw A2D data
   int raw = analogRead(IRPIN);
+  // convert the raw signal into a magnitude
   float mag = IRMAG(raw);
+  // find the current waveform state
   int state = waveform(mag);
   int i;
-  
+
   switch(state) {
     case WR:
     case W1:
-      if(microtime < 0)
+      if((pstate == WF)||(pstate == W0))
       {
-        microtime = micros();
+        // transition on rising edge or flip to 1
+        transition(true, microtime, millitime);
+        lastcap = millitime;
         color(4, 1);
       }
       break;
     case WF:
     case W0:
-      if(microtime >= 0)
+      if((pstate == WR)||(pstate == W1))
       {
-        if(numvalues < MAXVALUES)
-        {
-          numvalues++;
-          pdc[numvalues-1] = micros() - microtime;
-        }
-        millitime = millis();
-        microtime = -1;
+        // transition on falling edge or flip to 0
+        transition(false, microtime, millitime);
+        lastcap = millitime;
         color(0, 1);
-      }
-      else if((millitime > 0)&&(millis() - millitime > 200))
-      {
-        Serial.print("---- captured ");
-        Serial.print(numvalues);
-        Serial.println(" values ----");
-        for(i = 0; i < numvalues; i++)
-        {
-          Serial.print(pdc[i]);
-          if(i == numvalues - 1)
-            Serial.println("");
-          else if((i+1)%20 == 0)
-            Serial.println(",");
-          else
-            Serial.print(", ");
-        }
-        numvalues = 0;
-        millitime = -1;
       }
       break;
     default:
       Serial.println("UNKNOWN STATE");
       color(0, 0);
   }
+  pstate = state;
+  
+  // print out the data after the burst has stopped. This is
+  // necessary because the 9600 baud console will mess up the
+  // timing if we print during the burst
+  if((idx > 0)&&(lastcap >= 0)&&(millitime - lastcap > 200))
+  {
+      Serial.print("---- captured ");
+      Serial.print(end - start);
+      Serial.print(" ms -- ");
+      Serial.print(idx);
+      Serial.println(" values ----");
+      long total = 0;
+      long data = 0;
+      int bit = 0;
+      for(i = 1; i < idx; i++)
+      {
+        total += pdc[i]+ndc[i];
+        if(ndc[i] < 20000)
+        {
+          int out = (ndc[i] > 1000)?1:0;
+          data |= (out << bit);
+          bit++;
+        }
+        if((ndc[i] > 20000)||(i == idx - 1))
+        {
+          datapacket(data, bit);
+          Serial.println(data, HEX);
+          data = 0;
+          bit = 0;
+        }       
+      }
+      Serial.print(total);
+      Serial.println(" us");
+      idx = 0;
+      lastcap = -1;
+      start = end = -1;
+   }
 }
 
