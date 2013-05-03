@@ -27,6 +27,13 @@
 #define IRPIN 12
 #define IRMAG(d) ((1000 - (float)(d))/1000)
 #define MAXVALUES 500
+#define PROTOCOL PROTOCOL_SHARP
+
+enum {
+  PROTOCOL_SHARP = 0,
+  PROTOCOL_SONY,
+  PROTOCOL_HAUPPAUGE
+};
 
 // sections of the IR waveform
 enum {
@@ -44,7 +51,7 @@ long pdc[MAXVALUES];
 long ndc[MAXVALUES];
 // burst bit counter
 long idx = 0;
-
+ 
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
   {255,   0,   0}, // 1: red
@@ -166,9 +173,67 @@ void transition(bool val, long microtime, long millitime)
  *   data: data packet
  *   length: number of bits in data packet
  */
-void datapacket(long data, int length)
+int datapacket(long rawdata, int length)
 {
+#if (PROTOCOL == PROTOCOL_SHARP)
+  int i, chk, cmd, adr;
+  long data = 0;
+  
+  if(length != 15)
+    return 0;
 
+  // reverse the bits
+  for(i = length-1; i >= 0; i--)
+    data |= ((rawdata >> i) & 0x1) << (length-i-1);
+  
+  // extract the fields  
+  chk = data & 0x3;
+  adr = (data >> 10) & 0x1F;
+  cmd = (data >> 2) & 0xFF;
+  if(chk == 1)
+    cmd = ((cmd * -1) - 1) & 0xFF;
+  
+  Serial.print(chk);
+  Serial.print(" - ");
+  Serial.print(cmd);
+  Serial.print(" - ");
+  Serial.println(adr);
+
+  return keymap(cmd, adr);
+#else
+  return 0;
+#endif
+}
+
+int keymap(int cmd, int addr)
+{
+#if (PROTOCOL == PROTOCOL_SHARP)
+  if(addr != 16)
+    return 0;
+
+  switch(cmd) {
+    case 128: //1
+      return 1;
+    case 64: //2
+      return 4;
+    case 192: //3
+      return 5;
+    case 32: //4
+      return 1;
+    case 160: //5
+      return 4;
+    case 96: //6
+      return 5;
+    case 224: //7
+      return 1;
+    case 16: //8
+      return 4;
+    case 144: //9
+      return 5;
+    default:
+      return 4;
+  }
+#endif
 }
 
 void loop() {
@@ -180,6 +245,7 @@ void loop() {
   float mag = IRMAG(raw);
   // find the current waveform state
   int state = waveform(mag);
+  static int defcolor = 4;
   int i;
 
   switch(state) {
@@ -190,7 +256,7 @@ void loop() {
         // transition on rising edge or flip to 1
         transition(true, microtime, millitime);
         lastcap = millitime;
-        color(4, 1);
+        color(defcolor, 1);
       }
       break;
     case WF:
@@ -233,8 +299,7 @@ void loop() {
         }
         if((ndc[i] > 20000)||(i == idx - 1))
         {
-          datapacket(data, bit);
-          Serial.println(data, HEX);
+          defcolor = datapacket(data, bit);
           data = 0;
           bit = 0;
         }       
