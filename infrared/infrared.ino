@@ -21,21 +21,33 @@
  *    with this program; if not, write to the Free Software Foundation, Inc.,
  *    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
-#define SERIAL_BAUD 9600
+/* defines */
+#define SERIAL_BAUD 115200
 #define NUMCOLORS (sizeof(colorwheel)/(sizeof(int)*3))
+#define COLOR(i) rgb(colorwheel[i][0], colorwheel[i][1], colorwheel[i][2])
 #define IRPIN 0
 #define IRMAG(d) ((1000 - (float)(d))/1000)
-#define PROTOCOL_UNKNOWN 0
-#define PROTOCOL_SHARP 1
-#define PROTOCOL PROTOCOL_SHARP
-//#define PROTOCOL_DEBUG 1
+#define SERIAL_OUTPUT 1
+#define TRANSACTION_TIMEOUT 90
 
-#if (PROTOCOL == PROTOCOL_SHARP)
-#define MAXVALUES 32
-#else
-#define MAXVALUES 500
+/* protocol based defines */
+#define PROTOCOL_DEBUG 0
+/* debug protocol for completely unknown input */
+#if (PROTOCOL == PROTOCOL_DEBUG)
+#ifndef SERIAL_OUTPUT
+#define SERIAL_OUTPUT 1
 #endif
+#endif
+#define PROTOCOL_UNKNOWN 1
+/* debug protocol for known input but an unknown device */
+#if (PROTOCOL == PROTOCOL_UNKNOWN)
+#define CMDBITS 32
+#else
+#define CMDBITS 15
+#endif
+#define PROTOCOL_SHARP 2
+/* set PROTOCOL to the standard to be used */
+#define PROTOCOL PROTOCOL_SHARP
 
 // sections of the IR waveform
 enum {
@@ -45,17 +57,18 @@ enum {
   WF      // FALLING EDGE
 };
 
-#if (PROTOCOL == PROTOCOL_UNKNOWN)
+#if (PROTOCOL == PROTOCOL_DEBUG)
+#define MAXVALUES 500
 // start and end time of the IR burst
 long start = -1, end = -1;
 // positive duty cycle per burst bit
 long pdc[MAXVALUES];
 // negative duty cycle per burst bit
 long ndc[MAXVALUES];
-#endif
 // burst bit counter
 long numvals = 0;
- 
+#endif
+
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
   {255,   0,   0}, // 1: red
@@ -148,7 +161,7 @@ int waveform(float val)
  *   microtime: microsecond timestamp (used for timing info)
  *   millitime: millisecond timestamp (capture a maximum of 1 second of data)
  */
-#if (PROTOCOL == PROTOCOL_UNKNOWN)
+#if (PROTOCOL == PROTOCOL_DEBUG)
 void transition(bool val, long microtime, long millitime)
 {
   static long pmicrotime = -1;
@@ -175,12 +188,12 @@ void transition(bool val, long microtime, long millitime)
   pmicrotime = microtime;
 }
 #else
-void transition(bool val, long microtime, long millitime)
+void transition(bool val, long microtime, long millitime, bool timeout)
 {
-  static long pmicrotime = -100000;
+  static long pmicrotime = -1;
   static long data = 0, bits = 0;
 
-  if(val)
+  if(((val)&&(pmicrotime >= 0))||timeout)
   {
     // get the negative duty cycle
     long ndc = microtime - pmicrotime;
@@ -191,17 +204,17 @@ void transition(bool val, long microtime, long millitime)
       data = (data << 1) | (out & 0x1);
       bits++;
     }
-    if((ndc > 20000)||(bits >= 15))
+    //if((ndc > 20000)||(bits >= CMDBITS))
+    if(ndc > 20000)
     {
-      if(bits >= 15)
-      {
-        datapacket(data, 15);
-      }
+      datapacket(data, bits);
       data = 0;
       bits = 0;
+      pmicrotime = -1;
+      return;
     }
   }
-  
+
   pmicrotime = microtime;
 }
 #endif
@@ -225,7 +238,9 @@ int datapacket(long data, int length)
   if(chk == 1)
     cmd = ((cmd * -1) - 1) & 0xFF;
 
-#ifdef PROTOCOL_DEBUG  
+#ifdef SERIAL_OUTPUT  
+  Serial.print(data, HEX);
+  Serial.print(": - ");
   Serial.print(chk);
   Serial.print(" - ");
   Serial.print(cmd);
@@ -233,13 +248,16 @@ int datapacket(long data, int length)
   Serial.println(adr);
 #endif
   i = keymap(cmd, adr);
-  color(i, 1);
+  COLOR(i);
   return 0;
 #else
-  Serial.print("len: ");
-  Serial.print(length);
+#ifdef SERIAL_OUTPUT
   Serial.print(" data: ");
-  Serial.println(data, BIN);
+  Serial.print(data, HEX);
+  Serial.print(" (");
+  Serial.print(length);
+  Serial.println(" bits)");
+#endif
   return 0;
 #endif
 }
@@ -268,9 +286,13 @@ int keymap(int cmd, int addr)
     case 104: //POWER
       p = (p + 1)%6;
       return pcol[p];
+    case 216: //4
+      return 5;
     default:
       return 0;
   }
+#else
+  return 0;  
 #endif
 }
 
@@ -291,10 +313,10 @@ void loop() {
       if((pstate == WF)||(pstate == W0))
       {
         // transition on rising edge or flip to 1
-        transition(true, microtime, millitime);
-#if (PROTOCOL == PROTOCOL_UNKNOWN)
+        transition(true, microtime, millitime, false);
         lastcap = millitime;
-        color(4, 1);
+#if (PROTOCOL == PROTOCOL_DEBUG)
+        COLOR(4);
 #endif
       }
       break;
@@ -303,25 +325,25 @@ void loop() {
       if((pstate == WR)||(pstate == W1))
       {
         // transition on falling edge or flip to 0
-        transition(false, microtime, millitime);
-#if (PROTOCOL == PROTOCOL_UNKNOWN)
+        transition(false, microtime, millitime, false);
         lastcap = millitime;
-        color(0, 1);
+#if (PROTOCOL == PROTOCOL_DEBUG)
+        COLOR(0);
 #endif
       }
       break;
     default:
       Serial.println("UNKNOWN STATE");
-      color(0, 0);
   }
   pstate = state;
   
-#if (PROTOCOL == PROTOCOL_UNKNOWN)
+#if (PROTOCOL == PROTOCOL_DEBUG)
   // print out the data after the burst has stopped. This is
-  // necessary because the 9600 baud console will mess up the
+  // necessary because the serial console will mess up the
   // timing if we print during the burst
   if((numvals > 0)&&(lastcap >= 0)&&(millitime - lastcap > 200))
   {
+#ifdef SERIAL_OUTPUT
       Serial.print("---- captured ");
       Serial.print(end - start);
       Serial.print(" ms -- ");
@@ -333,31 +355,29 @@ void loop() {
       for(i = 0; i < numvals; i++)
       {
         total += pdc[i]+ndc[i];
-#ifdef PROTOCOL_DEBUG
         Serial.print(pdc[i]);
         Serial.print(" ");
         Serial.println(ndc[i]);
-#else
-        if(ndc[i] < 20000)
-        {
-          int out = (ndc[i] > 1000)?1:0;
-          data |= (out << bit);
-          bit++;
-        }
-        if((ndc[i] > 20000)||(i == numvals - 1))
-        {
-          datapacket(data, bit);
-          data = 0;
-          bit = 0;
-        }       
-#endif
       }
+      Serial.print("---- captured ");
       Serial.print(total);
-      Serial.println(" us");
+      Serial.print(" us -- ");
+      Serial.print(numvals);
+      Serial.println(" values ----");
+#endif
       numvals = 0;
       lastcap = -1;
       start = end = -1;
    }
+#else
+  if((lastcap >= 0)&&(millitime - lastcap > TRANSACTION_TIMEOUT))
+  {
+    transition(false, microtime, millitime, true);
+    lastcap = -1;
+#ifdef SERIAL_OUTPUT
+     Serial.println();
+#endif
+  }
 #endif
 }
 
