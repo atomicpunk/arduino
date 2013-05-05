@@ -135,7 +135,7 @@ void loop() {
   cmdtest(BUTTON_ONE, 0, 2000, 1);
   cmdtest(BUTTON_TWO, 0, 2000, 3);
   cmdtest(BUTTON_THREE, 0, 2000, 4);
+  cmdtest(BUTTON_DISPLAY, 0, 2000, 1);
   cmdtest(BUTTON_POWER, 1000, 2000, 5);
-  cmdtest(BUTTON_DISPLAY, 1000, 2000, 1);
 }
 
