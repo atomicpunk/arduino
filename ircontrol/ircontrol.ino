@@ -96,9 +96,6 @@ void sendCmd(long data, int bits)
   delayMicroseconds(PDC);
   digitalWrite(IRPIN, INACTIVE);
   delay(COMPLETE);
-//  digitalWrite(IRPIN, ACTIVE);
-//  delayMicroseconds(PDC);
-//  digitalWrite(IRPIN, INACTIVE);
 }
 
 void issueCmd(int cmd)
@@ -131,11 +128,70 @@ void cmdtest(int cmd, int cmd_ms, int del_ms, int color)
   COLOR(0);
 }
 
-void loop() {
+void sharpremotetest()
+{
   cmdtest(BUTTON_ONE, 0, 2000, 1);
   cmdtest(BUTTON_TWO, 0, 2000, 3);
   cmdtest(BUTTON_THREE, 0, 2000, 4);
   cmdtest(BUTTON_DISPLAY, 0, 2000, 1);
-  cmdtest(BUTTON_POWER, 1000, 2000, 5);
+  cmdtest(BUTTON_POWER, 1000, 2000, 5);  
+}
+
+void sharp3DShutter()
+{
+  bool right = false;
+  
+  while(1)
+  {
+    if(right)
+      COLOR(4);
+    else
+      COLOR(1);
+      
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //20
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(20); //40
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //60
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(20); //80
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //100
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(60); //160
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //180
+    digitalWrite(IRPIN, INACTIVE);
+    if(right)
+      delayMicroseconds(140); //dR = 320
+    else
+      delayMicroseconds(60); //dL = 240
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //dN+20
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(20); //dN+40
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //dN+60
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(80); //dN+140
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //dN+160
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(20); //dN+180
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(20); //dN+200
+    digitalWrite(IRPIN, INACTIVE);
+    if(right)
+      delayMicroseconds(8333 - 520);
+    else
+      delayMicroseconds(8333 - 440);
+      
+    right = !right;
+  }
+}
+
+void loop() {
+  sharp3DShutter();
 }
 
