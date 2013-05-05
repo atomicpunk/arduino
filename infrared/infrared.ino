@@ -24,11 +24,13 @@
 
 #define SERIAL_BAUD 9600
 #define NUMCOLORS (sizeof(colorwheel)/(sizeof(int)*3))
-#define IRPIN 12
+#define IRPIN 0
 #define IRMAG(d) ((1000 - (float)(d))/1000)
 #define PROTOCOL_UNKNOWN 0
 #define PROTOCOL_SHARP 1
 #define PROTOCOL PROTOCOL_SHARP
+//#define PROTOCOL_DEBUG 1
+
 #if (PROTOCOL == PROTOCOL_SHARP)
 #define MAXVALUES 32
 #else
@@ -64,7 +66,7 @@ int colorwheel[][3] = {
   {127,   0, 255}, // 6: indigo
   {255,   0, 255}, // 7: violet
   {  0, 255, 255}, // 8: seagreen
-  {255, 127, 255}  // 9: white
+  {255, 255, 255}  // 9: white
 };
 
 void setup() {
@@ -222,14 +224,16 @@ int datapacket(long data, int length)
   cmd = (data >> 2) & 0xFF;
   if(chk == 1)
     cmd = ((cmd * -1) - 1) & 0xFF;
-  
+
+#ifdef PROTOCOL_DEBUG  
   Serial.print(chk);
   Serial.print(" - ");
   Serial.print(cmd);
   Serial.print(" - ");
   Serial.println(adr);
+#endif
   i = keymap(cmd, adr);
-  rgb(colorwheel[i][0], colorwheel[i][1], colorwheel[i][2]);
+  color(i, 1);
   return 0;
 #else
   Serial.print("len: ");
@@ -243,28 +247,27 @@ int datapacket(long data, int length)
 int keymap(int cmd, int addr)
 {
 #if (PROTOCOL == PROTOCOL_SHARP)
+  static int p = 0;
+  int pcol[6] = {1, 3, 4, 5, 7, 8};
   if(addr != 16)
     return 0;
 
   switch(cmd) {
     case 128: //1
-      return 4;
+      return pcol[0];
     case 64: //2
-      return 5;
+      return pcol[1];
     case 192: //3
-      return 4;
+      return pcol[2];
     case 32: //4
-      return 5;
+      return pcol[3];
     case 160: //5
-      return 4;
+      return pcol[4];
     case 96: //6
-      return 5;
-    case 224: //7
-      return 4;
-    case 16: //8
-      return 5;
-    case 144: //9
-      return 4;
+      return pcol[5];
+    case 104: //POWER
+      p = (p + 1)%6;
+      return pcol[p];
     default:
       return 0;
   }
@@ -330,6 +333,11 @@ void loop() {
       for(i = 0; i < numvals; i++)
       {
         total += pdc[i]+ndc[i];
+#ifdef PROTOCOL_DEBUG
+        Serial.print(pdc[i]);
+        Serial.print(" ");
+        Serial.println(ndc[i]);
+#else
         if(ndc[i] < 20000)
         {
           int out = (ndc[i] > 1000)?1:0;
@@ -342,6 +350,7 @@ void loop() {
           data = 0;
           bit = 0;
         }       
+#endif
       }
       Serial.print(total);
       Serial.println(" us");
