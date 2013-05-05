@@ -25,10 +25,17 @@
 #define SERIAL_BAUD 115200
 #define NUMCOLORS (sizeof(colorwheel)/(sizeof(int)*3))
 #define COLOR(i) rgb(colorwheel[i][0], colorwheel[i][1], colorwheel[i][2])
-#define IRPIN 0
-#define IRMAG(d) ((1000 - (float)(d))/1000)
 #define SERIAL_OUTPUT 1
 #define TRANSACTION_TIMEOUT 90
+
+#define DIGITAL_INPUT 1
+#if (DIGITAL_INPUT)
+#define IRPIN 52
+#define IRMAG(d) ((d)==HIGH)?0:1;
+#else
+#define IRPIN 0
+#define IRMAG(d) ((1000 - (float)(d))/1000)
+#endif
 
 /* protocol based defines */
 #define PROTOCOL_DEBUG 0
@@ -162,7 +169,7 @@ int waveform(float val)
  *   millitime: millisecond timestamp (capture a maximum of 1 second of data)
  */
 #if (PROTOCOL == PROTOCOL_DEBUG)
-void transition(bool val, long microtime, long millitime)
+void transition(bool val, long microtime, long millitime, bool timeout)
 {
   static long pmicrotime = -1;
 
@@ -299,8 +306,13 @@ int keymap(int cmd, int addr)
 void loop() {
   long microtime = micros(), millitime = millis();
   static long lastcap = -1, pstate = W0;
+#if (DIGITAL_INPUT)
+  // read the data from the pin as raw A2D data
+  int raw = digitalRead(IRPIN);
+#else
   // read the data from the pin as raw A2D data
   int raw = analogRead(IRPIN);
+#endif
   // convert the raw signal into a magnitude
   float mag = IRMAG(raw);
   // find the current waveform state
