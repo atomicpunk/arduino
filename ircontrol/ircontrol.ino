@@ -96,9 +96,9 @@ void sendCmd(long data, int bits)
   delayMicroseconds(PDC);
   digitalWrite(IRPIN, INACTIVE);
   delay(COMPLETE);
-  digitalWrite(IRPIN, ACTIVE);
-  delayMicroseconds(PDC);
-  digitalWrite(IRPIN, INACTIVE);
+//  digitalWrite(IRPIN, ACTIVE);
+//  delayMicroseconds(PDC);
+//  digitalWrite(IRPIN, INACTIVE);
 }
 
 void issueCmd(int cmd)
@@ -125,9 +125,9 @@ void cmdtest(int cmd, int cmd_ms, int del_ms, int color)
   delay(del_ms);
   COLOR(color);
   if(cmd_ms > 0)
-    holdCmd(BUTTON_DISPLAY, cmd_ms);
+    holdCmd(cmd, cmd_ms);
   else
-    issueCmd(BUTTON_POWER);
+    issueCmd(cmd);
   COLOR(0);
 }
 
@@ -135,7 +135,7 @@ void loop() {
   cmdtest(BUTTON_ONE, 0, 2000, 1);
   cmdtest(BUTTON_TWO, 0, 2000, 3);
   cmdtest(BUTTON_THREE, 0, 2000, 4);
-  cmdtest(BUTTON_POWER, 2000, 2000, 5);
-  //cmdtest(BUTTON_DISPLAY, 0, 5000, 1);
+  cmdtest(BUTTON_POWER, 1000, 2000, 5);
+  cmdtest(BUTTON_DISPLAY, 1000, 2000, 1);
 }
 
