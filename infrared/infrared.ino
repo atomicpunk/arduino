@@ -37,24 +37,25 @@
 #define IRMAG(d) ((1000 - (float)(d))/1000)
 #endif
 
-/* protocol based defines */
-#define PROTOCOL_DEBUG 0
 /* debug protocol for completely unknown input */
+#define PROTOCOL_DEBUG 0
 #if (PROTOCOL == PROTOCOL_DEBUG)
 #ifndef SERIAL_OUTPUT
 #define SERIAL_OUTPUT 1
 #endif
 #endif
-#define PROTOCOL_UNKNOWN 1
+
 /* debug protocol for known input but an unknown device */
+#define PROTOCOL_UNKNOWN 1
 #if (PROTOCOL == PROTOCOL_UNKNOWN)
 #define CMDBITS 32
 #else
 #define CMDBITS 15
 #endif
-#define PROTOCOL_SHARP 2
+#define PROTOCOL_SHARP_REMOTE 2
+
 /* set PROTOCOL to the standard to be used */
-#define PROTOCOL PROTOCOL_SHARP
+#define PROTOCOL PROTOCOL_SHARP_REMOTE
 
 // sections of the IR waveform
 enum {
@@ -235,7 +236,7 @@ void transition(bool val, long microtime, long millitime, bool timeout)
  */
 int datapacket(long data, int length)
 {
-#if (PROTOCOL == PROTOCOL_SHARP)
+#if (PROTOCOL == PROTOCOL_SHARP_REMOTE)
   int i, chk, cmd, adr;
   
   // extract the fields  
@@ -271,7 +272,7 @@ int datapacket(long data, int length)
 
 int keymap(int cmd, int addr)
 {
-#if (PROTOCOL == PROTOCOL_SHARP)
+#if (PROTOCOL == PROTOCOL_SHARP_REMOTE)
   static int p = 0;
   int pcol[6] = {1, 3, 4, 5, 7, 8};
   if(addr != 16)
