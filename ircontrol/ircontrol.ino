@@ -27,26 +27,9 @@
 #define ACTIVE LOW
 #define INACTIVE HIGH
 #define IRPIN 7
-#define PDC 320     // positive duty cycle us
-#define NDC0 680    // negative duty cycle us for ZERO
-#define NDC1 1680   // negative duty cycle us for ONE
-#define COMPLETE 45 // negative duty cycle ms for cmd COMPLETE
-
-// sharp remote commands
-enum {
-  BUTTON_ONE=0,
-  BUTTON_TWO,
-  BUTTON_THREE,
-  BUTTON_POWER,
-  BUTTON_DISPLAY
-};
-const long cmdlist[][3] = {
-  {0x4202, 0x41FD, 15},
-  {0x4102, 0x42FD, 15},
-  {0x4302, 0x40FD, 15},
-  {0x41A2, 0x425D, 15},
-  {0x4362, 0x409D, 15}
-};
+#define MODE_3DGLASSES 0
+#define MODE_REMOTECTL 1
+#define CTLMODE MODE_REMOTECTL
 
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
@@ -75,6 +58,30 @@ void rgb(int r, int g, int b)
     analogWrite(11, b);
     analogWrite(10, g);
 }
+
+#if (CTLMODE == MODE_REMOTECTL)
+
+/* sharp remote control code */
+#define PDC 320     // positive duty cycle us
+#define NDC0 680    // negative duty cycle us for ZERO
+#define NDC1 1680   // negative duty cycle us for ONE
+#define COMPLETE 45 // negative duty cycle ms for cmd COMPLETE
+
+enum {
+  BUTTON_ONE=0,
+  BUTTON_TWO,
+  BUTTON_THREE,
+  BUTTON_POWER,
+  BUTTON_DISPLAY
+};
+
+const long cmdlist[][3] = {
+  {0x4202, 0x41FD, 15},
+  {0x4102, 0x42FD, 15},
+  {0x4302, 0x40FD, 15},
+  {0x41A2, 0x425D, 15},
+  {0x4362, 0x409D, 15}
+};
 
 void sendCmd(long data, int bits)
 {
@@ -137,61 +144,64 @@ void sharpremotetest()
   cmdtest(BUTTON_POWER, 1000, 2000, 5);  
 }
 
+#elif (CTLMODE == MODE_3DGLASSES)
+
+/* sharp 3D active shutter glasses code */
+
+bool righteye[14] = { 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1 };
+bool  lefteye[12] = { 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1 };
+bool  test25k[4]  = { 1, 1, 1, 1 };
+
+void carrierFreq25k(bool signal[], int num)
+{
+  int i;
+  for(i = 0; i < num; i++)
+  {
+    digitalWrite(IRPIN, (signal[i])?ACTIVE:INACTIVE);
+    delayMicroseconds(14);
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(15);
+  }
+}
+
 void sharp3DShutter()
 {
   bool right = false;
-  
   while(1)
   {
     if(right)
-      COLOR(4);
-    else
-      COLOR(1);
-      
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //20
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(20); //40
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //60
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(20); //80
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //100
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(60); //160
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //180
-    digitalWrite(IRPIN, INACTIVE);
-    if(right)
-      delayMicroseconds(140); //dR = 320
-    else
-      delayMicroseconds(60); //dL = 240
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //dN+20
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(20); //dN+40
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //dN+60
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(80); //dN+140
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //dN+160
-    digitalWrite(IRPIN, INACTIVE);
-    delayMicroseconds(20); //dN+180
-    digitalWrite(IRPIN, ACTIVE);
-    delayMicroseconds(20); //dN+200
-    digitalWrite(IRPIN, INACTIVE);
-    if(right)
+    {
+      carrierFreq25k(righteye, 14);
       delayMicroseconds(8333 - 520);
+    }
     else
+    {
+      carrierFreq25k(lefteye, 12);
       delayMicroseconds(8333 - 440);
-      
+    }
     right = !right;
   }
 }
 
+void carrierFreq25kTest()
+{
+  while(1)
+      carrierFreq25k(test25k, 4);
+}
+
+#endif
+
+/* main */
+
 void loop() {
+#if (CTLMODE == MODE_REMOTECTL)
+
+  sharpremotetest();
+  
+#elif (CTLMODE == MODE_3DGLASSES)
+
   sharp3DShutter();
+  
+#endif
 }
 
