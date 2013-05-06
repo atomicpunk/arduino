@@ -29,7 +29,7 @@
 #define IRPIN 7
 #define MODE_3DGLASSES 0
 #define MODE_REMOTECTL 1
-#define CTLMODE MODE_REMOTECTL
+#define CTLMODE MODE_3DGLASSES
 
 int colorwheel[][3] = {
   {  0,   0,   0}, // 0: black (off)
@@ -62,10 +62,12 @@ void rgb(int r, int g, int b)
 #if (CTLMODE == MODE_REMOTECTL)
 
 /* sharp remote control code */
-#define PDC 320     // positive duty cycle us
-#define NDC0 680    // negative duty cycle us for ZERO
-#define NDC1 1680   // negative duty cycle us for ONE
+#define PDC 320     // positive duty cycle us (12.16 periods)
+#define NDC0 680    // negative duty cycle us for ZERO (25.84 periods -- 38 periods)
+#define NDC1 1680   // negative duty cycle us for ONE (63.84 periods -- 76 periods)
 #define COMPLETE 45 // negative duty cycle ms for cmd COMPLETE
+
+// 26.315789474 us period
 
 enum {
   BUTTON_ONE=0,
@@ -82,6 +84,21 @@ const long cmdlist[][3] = {
   {0x41A2, 0x425D, 15},
   {0x4362, 0x409D, 15}
 };
+
+void carrierFreq38k(long data, int bits)
+{
+}
+
+void carrierFreq38kTest()
+{
+  while(1)
+  {
+    digitalWrite(IRPIN, ACTIVE);
+    delayMicroseconds(8);
+    digitalWrite(IRPIN, INACTIVE);
+    delayMicroseconds(9);
+  }
+}
 
 void sendCmd(long data, int bits)
 {
@@ -164,6 +181,10 @@ void carrierFreq25k(bool signal[], int num)
   }
 }
 
+#define PERIOD 8333 // 120hz
+//#define PERIOD 11200 // min 89hz
+//#define PERIOD 6600 // max 152 hz
+
 void sharp3DShutter()
 {
   bool right = false;
@@ -172,12 +193,12 @@ void sharp3DShutter()
     if(right)
     {
       carrierFreq25k(righteye, 14);
-      delayMicroseconds(8333 - 520);
+      delayMicroseconds(PERIOD - 520);
     }
     else
     {
       carrierFreq25k(lefteye, 12);
-      delayMicroseconds(8333 - 440);
+      delayMicroseconds(PERIOD - 440);
     }
     right = !right;
   }
@@ -197,6 +218,7 @@ void loop() {
 #if (CTLMODE == MODE_REMOTECTL)
 
   sharpremotetest();
+  //carrierFreq38kTest();
   
 #elif (CTLMODE == MODE_3DGLASSES)
 
