@@ -23,6 +23,14 @@
  */
  
 #define NUMCOLORS 7
+<<<<<<< HEAD
+#define COLORTIME 10000
+#define COLORDELAY 10
+#define INCREMENTS (COLORTIME/COLORDELAY)
+#define PIN_R 11
+#define PIN_G 10
+#define PIN_B 9
+=======
 #define COLORTIME 1000
 #define COLORDELAY 100
 #define INCREMENTS (COLORTIME/COLORDELAY)
@@ -32,6 +40,7 @@
 //#define D2 (HISTORY-1)
 #define D1 0
 #define D2 0
+>>>>>>> 22456781fd623ae077f9b9f758ba8e3f5c5a0160
 
 int colorwheel[NUMCOLORS][3] = {
   {255, 127,   0}, // orange
@@ -44,40 +53,16 @@ int colorwheel[NUMCOLORS][3] = {
 };
 
 void setup() {
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(7, OUTPUT);
-  pinMode(8, OUTPUT);
-  pinMode(9, OUTPUT);
-  pinMode(10, OUTPUT);
-  pinMode(11, OUTPUT);
-  pinMode(12, OUTPUT);
-  pinMode(13, OUTPUT);
+  pinMode(PIN_R, OUTPUT);
+  pinMode(PIN_G, OUTPUT);
+  pinMode(PIN_B, OUTPUT);
 }
-
-int history[HISTORY][3];
 
 void rgb(int r, int g, int b)
 {
-    int i, j;
-    
-    for(i = HISTORY-1; i > 0; i--)
-        for(j = 0; j < 3; j++)
-            history[i][j] = history[i-1][j];
-
-    history[0][0] = r;
-    history[0][1] = b;
-    history[0][2] = g;
-
-    analogWrite(5, history[D2][0]);
-    analogWrite(6, history[D2][1]);
-    analogWrite(7, history[D2][2]);
-    analogWrite(8, history[D1][0]);
-    analogWrite(9, history[D1][1]);
-    analogWrite(10, history[D1][2]);
-    analogWrite(11, r);
-    analogWrite(12, b);
-    analogWrite(13, g);
+    analogWrite(PIN_R, r);
+    analogWrite(PIN_G, b);
+    analogWrite(PIN_B, g);
     delay(COLORDELAY);
 }
 
