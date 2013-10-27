@@ -3,8 +3,7 @@
 //            Arduino IDE: Arduino-1.0
 //            Date:      April 17, 2013
 //            Copyright© 2013 RadioShack Corporation
-//
-//  This library is free software; you can redistribute it and/or
+//tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt m//  This library is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU Lesser General Public
 //  License as published by the Free Software Foundation; either
 //  version 2.1 of the License, or (at your option) any later version.
@@ -35,7 +34,8 @@
 #define NUM_STRIPS 1
 #endif
 
-unsigned long halloween_basic[10] = {0xff7f00,0xdf6f00,0x9f4f00,0x5f2f00,0x1f0f00,0x070300,0x1f0f00,0x5f2f00,0x9f4f00,0xdf6f00};
+//unsigned long halloween_basic[10] = {0xff7f00,0xdf6f00,0x9f4f00,0x5f2f00,0x1f0f00,0x070300,0x1f0f00,0x5f2f00,0x9f4f00,0xdf6f00};
+unsigned long halloween_basic[] = {0x707f00,0xdf6f00,0x9f4f00,0x5f2f00,0x1f0f00,0x070300,0x1f0f00,0x5f2f00,0x9f4f00,0xdf6f00};
 unsigned long christmas_basic[10] = {0xff0000,0x006f00,0x9f0000,0x002f00,0x1f0000,0x000300,0x1f0000,0x002f00,0x9f0000,0x006f00};
 unsigned long pattern[10][NUM_STRIPS*10]={};
 
@@ -72,36 +72,32 @@ unsigned long format_correction(unsigned long val, int format)
   return out;
 }
 
-void setup_pattern(unsigned long basic[10], int format) {
+void setup_pattern(unsigned long basic[], int format) {
   int i,j,k;
   unsigned long frame[10], temp;
  
   for (i=0;i<10;i++)
     frame[i] = basic[i];
 
-  switch(format) {
-  case 0: // step 10 times, move towards board
-    for (i=0;i<10;i++)
-    {
-      for (j=0;j<(NUM_STRIPS*10);j++)
-        pattern[i][j] = format_correction(frame[j%10], FORMAT_CORRECTION);
-      temp = frame[0];
-      for (k=0;k<9;k++)
-        frame[k] = frame[k+1];
-      frame[9] = temp;
+  for (i=0;i<10;i++)
+  {
+    for (j=0;j<(NUM_STRIPS*10);j++)
+      pattern[i][j] = format_correction(frame[j%10], FORMAT_CORRECTION);
+      
+    switch(format) {
+    case 0: // step 10 times, move towards board
+        temp = frame[0];
+        for (k=0;k<9;k++)
+          frame[k] = frame[k+1];
+        frame[9] = temp;
+      break;
+    case 1: // step 10 times, move away from board
+        temp = frame[9];
+        for (k=9;k>0;k--)
+          frame[k] = frame[k-1];
+        frame[0] = temp;
+      break;
     }
-    break;
-  case 1: // step 10 times, move away from board
-    for (i=0;i<10;i++)
-    {
-      for (j=0;j<(NUM_STRIPS*10);j++)
-        pattern[i][j] = format_correction(frame[j%10], FORMAT_CORRECTION);
-      temp = frame[9];
-      for (k=9;k>0;k--)
-        frame[k] = frame[k-1];
-      frame[0] = temp;
-    }
-    break;
   }
 }
 
@@ -111,7 +107,7 @@ void setup() {
   #if NUM_STRIPS > 1
   reset_strip(0xFD);
   #endif
-  setup_pattern(halloween_basic, 0);
+  setup_pattern(halloween_basic, 1);
 }
 
 int loop_count = 0;
