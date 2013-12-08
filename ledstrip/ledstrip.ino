@@ -398,6 +398,9 @@ void setup() {
   reset_strip(0xFD);
 #endif
   setup_pattern(christmas_basic, 1);
+  cmdString = "";
+  pos=A_RESET;
+  newpos=35;
   Serial.begin(SERIAL_BAUD);
   myservo.attach(PIN);
   delay(1000);
