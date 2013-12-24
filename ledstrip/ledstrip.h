@@ -340,3 +340,9 @@ void setupLedStrip() {
   reset_strip(0xFD);
 #endif
 }
+
+int ledframe_index = 0;
+void loopLedStrip() {
+  send_pattern_line(pattern[ledframe_index]);
+  ledframe_index = (ledframe_index + 1) % pattern_size;
+}
