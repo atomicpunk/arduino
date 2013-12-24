@@ -24,6 +24,7 @@
 
 #include <avr/pgmspace.h>
 #define CHRISTMAS 1
+#define FRAMEDELAY 100
 
 #ifdef BOARD_ATMEGA
 #define DATA_1 PORTF   // DATA 1    // for ATMEGA

@@ -175,7 +175,7 @@ void loop()
   for (i=0;i<pattern_size;i++)
   {
     send_pattern_line(pattern[i]);
-    delay(100);
+    delay(FRAMEDELAY);
   }
 }
 
