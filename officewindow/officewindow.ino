@@ -33,19 +33,15 @@ struct thread_t {
 #define BOARD_UNO 1
 #include "/home/tebrandt/workspace/arduino/ledstrip/ledstrip.h"
 
-//#define USE_SERVO 1
-#ifdef USE_SERVO
-#include <Servo.h>
-#include "/home/tebrandt/workspace/arduino/Sweep/Sweep.h"
-#endif
+//#include <Servo.h>
+//#include "/home/tebrandt/workspace/arduino/Sweep/Sweep.h"
 
+#include <VirtualWire.h>
 #define RADIOPIN 1
 
 struct thread_t threads[] = {
   {0, FRAMEDELAY, setupLedStrip, loopLedStrip},
-#ifdef USE_SERVO
-  {0, 240, setupSweep, loopSweep},
-#endif
+//  {0, 240, setupSweep, loopSweep},
 };
 #define NUM_THREADS (sizeof(threads)/sizeof(struct thread_t))
 
@@ -55,8 +51,12 @@ void setup() {
     threads[i].lasttime = millis();
     threads[i].setupfunc();
   }
+  vw_set_ptt_inverted(true); // Required for DR3100
+  vw_setup(1200);	 // Bits per sec
+  vw_set_tx_pin(RADIOPIN); 
 }
 
+const char *synccmd = "b";
 void loop()
 {
   int i;
@@ -65,6 +65,10 @@ void loop()
     if(time - threads[i].lasttime >= threads[i].timeslice) {
       threads[i].loopfunc();
       threads[i].lasttime = time;
+      if(ledframe_index == 0) {
+        vw_send((uint8_t *)synccmd, 1);
+        vw_wait_tx();
+      }
     }
   }
 }
