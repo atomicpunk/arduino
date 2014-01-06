@@ -24,62 +24,31 @@
 #include <Arduino.h>
 #include <VirtualWire.h>
 
-#define RADIOPIN 0
-#define PIN_R 13
-#define PIN_G 10
-#define PIN_B 11
+#define RANGEPIN 0
+#define LEDS 7
+int pins[LEDS] = {13,11,9,7,5,3,1};
 
-int colorwheel[7][3] = {
-  {255,   0,   0}, // red 
-  {255, 127,   0}, // orange
-  {255, 255,   0}, // yellow
-  {  0, 255,   0}, // green
-  {  0,   0, 255}, // blue
-  {127,   0, 255}, // indigo
-  {255,   0, 255}, // violet
-};
-
-void rgb(int r, int g, int b)
+void light(int level)
 {
-    analogWrite(PIN_R, r);
-    analogWrite(PIN_G, g);
-    analogWrite(PIN_B, b);
-}
-
-void color(int i)
-{
-    analogWrite(PIN_R, colorwheel[i][0]);
-    analogWrite(PIN_G, colorwheel[i][1]);
-    analogWrite(PIN_B, colorwheel[i][2]);
+  int i;
+  for(i = 0; i < LEDS; i++) {
+    if(i < level)
+      digitalWrite(pins[i], HIGH);
+    else
+      digitalWrite(pins[i], LOW);
+  }
 }
 
 void setup() {
-  rgb(0, 0, 0);
-  Serial.begin(9600);
-  pinMode(PIN_R, OUTPUT);
-  pinMode(PIN_G, OUTPUT);
-  pinMode(PIN_B, OUTPUT);
-  vw_set_ptt_inverted(true);
-  vw_setup(1200);
-  vw_set_rx_pin(RADIOPIN);
-  vw_rx_start();
+  int i;
+  for(i = 0; i < LEDS; i++)
+    pinMode(pins[i], OUTPUT);
+  light(0);
 }
 
 void loop()
 {
-    int i;
-    uint8_t buf[VW_MAX_MESSAGE_LEN];
-    uint8_t buflen = VW_MAX_MESSAGE_LEN;
-
-    if (vw_get_message(buf, &buflen))
-    {
-        color(3);
-        for(i = 0; i < buflen; i++) {
-          Serial.print((char)buf[i]);
-        }
-        Serial.println("");
-    } else {
-        rgb(0, 0, 0);
-    }
+  int range = analogRead(RANGEPIN);
+  light(range/12);
 }
 
