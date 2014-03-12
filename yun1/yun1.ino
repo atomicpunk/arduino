@@ -98,17 +98,17 @@ void runCommand(String rawcmd) {
     setAltitude(ALTDEF);
     setAzimuth(AZIDEF);
   } else if(rawcmd == "roof1") {
-    setAltitude(30);
     setAzimuth(120);
+    setAltitude(30);
   } else if(rawcmd == "roof2") {
-    setAltitude(32);
     setAzimuth(24);
+    setAltitude(32);
   } else if(rawcmd == "left") {
-    setAltitude(60);
     setAzimuth(110);
-  } else if(rawcmd == "right") {
     setAltitude(60);
+  } else if(rawcmd == "right") {
     setAzimuth(63);
+    setAltitude(60);
   } else if(rawcmd == "i") {
     Console.print("alt: ");
     Console.println(altitude);
