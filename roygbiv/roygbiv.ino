@@ -23,24 +23,13 @@
  */
  
 #define NUMCOLORS 7
-<<<<<<< HEAD
-#define COLORTIME 10000
+#define COLORTIME 10
 #define COLORDELAY 10
 #define INCREMENTS (COLORTIME/COLORDELAY)
-#define PIN_R 11
-#define PIN_G 10
-#define PIN_B 9
-=======
-#define COLORTIME 1000
-#define COLORDELAY 100
-#define INCREMENTS (COLORTIME/COLORDELAY)
-//#define HISTORY INCREMENTS
-#define HISTORY 1
-//#define D1 ((HISTORY/2)-1)
-//#define D2 (HISTORY-1)
-#define D1 0
-#define D2 0
->>>>>>> 22456781fd623ae077f9b9f758ba8e3f5c5a0160
+#define PIN_R 13
+#define PIN_G 12
+#define PIN_B 11
+
 
 int colorwheel[NUMCOLORS][3] = {
   {255, 127,   0}, // orange

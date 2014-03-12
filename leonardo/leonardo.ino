@@ -24,7 +24,7 @@
 #include <Arduino.h>
 #include <VirtualWire.h>
 
-#define RANGEPIN 0
+#define RADIOPIN 0
 #define LEDS 7
 int pins[LEDS] = {13,11,9,7,5,3,1};
 
@@ -41,14 +41,35 @@ void light(int level)
 
 void setup() {
   int i;
+  Serial.begin(9600);
   for(i = 0; i < LEDS; i++)
     pinMode(pins[i], OUTPUT);
+  pinMode(RADIOPIN, INPUT);
   light(0);
+  vw_set_ptt_inverted(true);
+  vw_setup(1200);
+  //vw_set_rx_pin(RADIOPIN);
+  vw_rx_start();
+  Serial.println("Leonardo READY");
 }
 
 void loop()
 {
-  int range = analogRead(RANGEPIN);
-  light(range/12);
+  int raw = digitalRead(RADIOPIN);
+  light(raw);
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  if (vw_get_message(buf, &buflen)) // Non-blocking
+  {
+    int i;
+    light(5);
+    Serial.print("Got: ");
+    for (i = 0; i < buflen; i++)
+    {
+      Serial.print(buf[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println("");
+  }
 }
 

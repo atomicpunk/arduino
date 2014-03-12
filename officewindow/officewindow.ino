@@ -22,6 +22,7 @@
  */
 
 #include <Arduino.h>
+
 typedef void (*call_t)();
 struct thread_t {
   unsigned long lasttime;
@@ -30,46 +31,143 @@ struct thread_t {
   call_t loopfunc;
 };
 
-#define BOARD_UNO 1
-#include "/home/tebrandt/workspace/arduino/ledstrip/ledstrip.h"
+#include <VirtualWire.h>
+#define RADIOPIN 0
 
+#if 0
 //#include <Servo.h>
-//#include "/home/tebrandt/workspace/arduino/Sweep/Sweep.h"
+#define SERVO_ALT_PIN 11
+#define SERVO_AZI_PIN 10
+#define SERVO_CLAW_PIN 11
+#define SERVO_WRIST_PIN 10
+#define ALTMIN 700  // 0 degrees (down)
+#define ALTMAX 2000 // 120 degrees (forward/up)
+#define ALTANGMAX 125
+#define AZIMIN 880  // 0 degrees (right)
+#define AZIMAX 2480 // 180 degrees (left)
+#define AZIANGMAX 180
+#define CLAWMIN 600  // 0 degrees (down)
+#define CLAWMAX 2200 // 120 degrees (forward/up)
+#define CLAWANGMAX 90
+#define WRISTMIN 580  // 0 degrees (right)
+#define WRISTMAX 2350 // 180 degrees (left)
+#define WRISTANGMAX 180
 
-//#include <VirtualWire.h>
-//#define RADIOPIN 1
+Servo servoAlt, servoAzi;
+Servo servoClaw, servoWrist;
+
+void setAltitude(float angle)
+{
+  if(angle < 0) angle = 0;
+  if(angle > ALTANGMAX) angle = ALTANGMAX;
+  float us = ALTMIN + (angle*(ALTMAX-ALTMIN)/ALTANGMAX);
+  servoAlt.writeMicroseconds(us);
+}
+
+void setAzimuth(float angle)
+{
+  if(angle < 0) angle = 0;
+  if(angle > AZIANGMAX) angle = AZIANGMAX;
+  float us = AZIMIN + (angle*(AZIMAX-AZIMIN)/AZIANGMAX);
+  servoAzi.writeMicroseconds(us);
+}
+
+void setClaw(float angle)
+{
+  if(angle < 0) angle = 0;
+  if(angle > CLAWANGMAX) angle = CLAWANGMAX;
+  float us = CLAWMIN + (angle*(CLAWMAX-CLAWMIN)/CLAWANGMAX);
+  servoClaw.writeMicroseconds(us);
+}
+
+void setWrist(float angle)
+{
+  if(angle < 0) angle = 0;
+  if(angle > WRISTANGMAX) angle = WRISTANGMAX;
+  float us = WRISTMIN + (angle*(WRISTMAX-WRISTMIN)/WRISTANGMAX);
+  servoWrist.writeMicroseconds(us);
+}
+
+void setupCamera() {
+  servoAlt.attach(SERVO_ALT_PIN);
+  delay(100);
+  setAltitude(90);
+  servoAzi.attach(SERVO_AZI_PIN);
+  delay(100);
+  setAzimuth(90);
+//  servoClaw.attach(SERVO_CLAW_PIN);
+//  delay(100);
+//  setClaw(0);
+//  servoWrist.attach(SERVO_WRIST_PIN);
+//  delay(100);
+//  setWrist(90);
+}
+
+float t = 0;
+void loopCamera() {
+  float icosval4 = (0.5 - 0.5*cos(t*4*3.14159/180));
+  float sinval = (0.5 + 0.5*sin(t*3.14159/180));
+  t += 0.5;
+//  setClaw(icosval4*CLAWANGMAX);
+//  setWrist(sinval*WRISTANGMAX);
+  setAzimuth(sinval*AZIANGMAX);
+}
+#endif
+
+void setupRadio() {
+  vw_set_ptt_inverted(true);
+  vw_setup(2000);
+  //vw_set_rx_pin(RADIOPIN);
+  vw_rx_start();
+  Serial.println("START");
+}
+
+void loopRadio() {
+}
+
+void loop() {
+  uint8_t buf[VW_MAX_MESSAGE_LEN];
+  uint8_t buflen = VW_MAX_MESSAGE_LEN;
+  if (vw_get_message(buf, &buflen)) // Non-blocking
+  {
+    int i;
+    Serial.print("Got: ");
+    for (i = 0; i < buflen; i++)
+    {
+      Serial.print(buf[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println("");
+  }
+}
 
 struct thread_t threads[] = {
-  {0, FRAMEDELAY, setupLedStrip, loopLedStrip},
-//  {0, 240, setupSweep, loopSweep},
+//  {0, 50, setupCamera, loopCamera},
+  {0, 1, setupRadio, loopRadio},
 };
 #define NUM_THREADS (sizeof(threads)/sizeof(struct thread_t))
 
 void setup() {
   int i;
-  for(i = 0; i < NUM_THREADS; i++) {
+  Serial.begin(9600);
+  for (i = 0; i < NUM_THREADS; i++) {
     threads[i].lasttime = millis();
     threads[i].setupfunc();
   }
-//  vw_set_ptt_inverted(true); // Required for DR3100
-//  vw_setup(1200);	 // Bits per sec
-//  vw_set_tx_pin(RADIOPIN); 
+  Serial.println("START");
+  digitalWrite(1, HIGH);
 }
 
-//const char *synccmd = "b";
-void loop()
-{
-  int i;
-  unsigned long time = millis();
-  for(i = 0; i < NUM_THREADS; i++) {
-    if(time - threads[i].lasttime >= threads[i].timeslice) {
-      threads[i].loopfunc();
-      threads[i].lasttime = time;
-//      if(ledframe_index == 0) {
-//        vw_send((uint8_t *)synccmd, 1);
-//        vw_wait_tx();
-//      }
-    }
-  }
-}
+//void loop()
+//{
+//  int i;
+//  unsigned long time = millis();
+//  for (i = 0; i < NUM_THREADS; i++) {
+//    if (time - threads[i].lasttime >= threads[i].timeslice) {
+//      threads[i].loopfunc();
+//      threads[i].lasttime = time;
+//    }
+//  }
+//}
+
 
